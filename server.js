@@ -1,9 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors');
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 function logError(location, error) {
     console.error(`❌ [${location}] Error:`, error?.response?.data || error.message);
@@ -35,7 +37,7 @@ app.post('/get-audio', async (req, res) => {
         console.log("🔹 Prompt sent to OpenAI:", userPrompt);
 
         if (!process.env.OPENAI_API_KEY) {
-            logError("Server", "❌ OpenAI API key is missing!");
+            console.error("❌ OpenAI API key is missing!");
             return res.status(500).json({ error: "Missing OpenAI API key" });
         }
 
@@ -51,7 +53,7 @@ app.post('/get-audio', async (req, res) => {
 
             aiText = gptResponse.data.choices?.[0]?.message?.content || "Error: No response from AI.";
         } catch (gptError) {
-            logError("ChatGPT API", gptError);
+            console.error("ChatGPT API", gptError?.response?.data || gptError.message);
             return res.status(500).json({ error: "Failed to generate AI response" });
         }
 
@@ -65,15 +67,17 @@ app.post('/get-audio', async (req, res) => {
                 responseType: 'arraybuffer'
             });
 
-            res.set({ 'Content-Type': 'audio/mpeg' });
+            res.set({ 'Content-Type': 'audio/mpeg',
+                      'Access-Control-Allow-Origin' : '*'
+             });
             res.send(ttsResponse.data);
         } catch (ttsError) {
-            logError("TTS API", ttsError);
+            console.error("TTS API Error:", ttsError?.response?.data || ttsError.message);
             return res.status(500).json({ error: "Failed to generate audio response" });
         }
 
     } catch (error) {
-        logError("General Server Error", error);
+        console.error("General Server Error:", error.message);
         res.status(500).json({ error: "Unexpected server error" });
     }
 });
