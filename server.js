@@ -5,9 +5,17 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
+function logError(location, error) {
+    console.error(`❌ [${location}] Error:`, error?.response?.data || error.message);
+}
+
 app.post('/get-audio', async (req, res) => {
     try {
         const { buttonId } = req.body;
+        if (buttonId === undefined) {
+            return res.status(400).json({ error: "buttonId is required" });
+        }
+
         const prompts = {
             0: "Spiele den Character von SILENCE. gib den Spieler seine aufgabe aus den SILENCE karten und füge nach deinem eigenen belangen noch schnippische kommentare gegenüber des Spielers",
             1: "Der spieler muss zwischen 10 und 0 Feldern vor oder zurück. Wähle in diesem bereich eine zufällige zahl und teile diese dem Spieler mit. Du spielst den character des erzählers.",
@@ -22,9 +30,14 @@ app.post('/get-audio', async (req, res) => {
             10: "Ende mit 3 überlebenden",
             11: "Ebde mit 4 überlebenden"
         };
-        const userPrompt = prompts[buttonId] || "Default response.";
 
+        const userPrompt = prompts[buttonId] || "Default response.";
         console.log("🔹 Prompt sent to OpenAI:", userPrompt);
+
+        if (!process.env.OPENAI_API_KEY) {
+            logError("Server", "❌ OpenAI API key is missing!");
+            return res.status(500).json({ error: "Missing OpenAI API key" });
+        }
 
         // ChatGPT API request
         let aiText = "Error: No response received.";
@@ -38,13 +51,13 @@ app.post('/get-audio', async (req, res) => {
 
             aiText = gptResponse.data.choices?.[0]?.message?.content || "Error: No response from AI.";
         } catch (gptError) {
-            console.error("❌ GPT API Error:", gptError?.response?.data || gptError.message);
-            return res.status(500).send("Error generating AI response.");
+            logError("ChatGPT API", gptError);
+            return res.status(500).json({ error: "Failed to generate AI response" });
         }
 
         // Use a text-to-speech API (e.g., OpenAI's or ElevenLabs) to convert text to audio
         try {
-            const audioResponse = await axios.post("https://api.openai.com/v1/audio/speech", {
+            const ttsResponse = await axios.post("https://api.openai.com/v1/audio/speech", {
                 model: "tts-1",
                 input: aiText
             }, {
@@ -53,15 +66,15 @@ app.post('/get-audio', async (req, res) => {
             });
 
             res.set({ 'Content-Type': 'audio/mpeg' });
-            res.send(audioResponse.data);
+            res.send(ttsResponse.data);
         } catch (ttsError) {
-            console.error("❌ TTS API Error:", ttsError?.response?.data || ttsError.message);
-            return res.status(500).send("Error generating audio.");
+            logError("TTS API", ttsError);
+            return res.status(500).json({ error: "Failed to generate audio response" });
         }
 
     } catch (error) {
-        console.error("🔥 General Server Error:", error.message);
-        res.status(500).send("Fallback to playRandomAudio()");
+        logError("General Server Error", error);
+        res.status(500).json({ error: "Unexpected server error" });
     }
 });
 
