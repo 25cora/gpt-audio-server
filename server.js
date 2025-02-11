@@ -37,7 +37,7 @@ app.post('/get-audio', async (req, res) => {
         console.log("🔹 Prompt sent to OpenAI:", userPrompt);
 
         if (!process.env.OPENAI_API_KEY) {
-            console.error("❌ OpenAI API key is missing!");
+            console.error("OpenAI API key is missing!");
             return res.status(500).json({ error: "Missing OpenAI API key" });
         }
 
@@ -45,7 +45,7 @@ app.post('/get-audio', async (req, res) => {
         let aiText = "Error: No response received.";
         try {
             const gptResponse = await axios.post("https://api.openai.com/v1/chat/completions", {
-                model: "gpt-4-turbo",
+                model: "gpt-3.5-turbo",
                 messages: [{ role: "system", content: userPrompt }]
             }, {
                 headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }
